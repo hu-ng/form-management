@@ -1,10 +1,11 @@
-from flask import render_template, url_for, flash, redirect, request, abort
+from flask import render_template, url_for, flash, redirect, request, abort, session, make_response
+from flask.json import jsonify
 from zoom_app import app, db, bcrypt
 from zoom_app.forms import RegistrationForm, LoginForm, MeetingRegistrationForm, MetaMeetingForm
 from zoom_app.models import User, MeetingForm, Registrant
 from flask_login import login_user, current_user, logout_user, login_required
 from zoom_app.env import *  # Use a library to fix this later
-
+from requests_oauthlib import OAuth2Session
 
 
 # Custom Jinja functions
@@ -18,9 +19,55 @@ def utility_processor():
     return dict(list_length=list_length, return_idx_in_list=return_idx_in_list)
 
 
+# Zoom OAuth Authorization. Followed from example found here:
+# https://requests-oauthlib.readthedocs.io/en/latest/examples/real_world_example.html#real-example
+
+@app.route("/zoomauth")
+def zoom_auth():
+    """Step 1: User Authorization.
+
+    Redirect the user/resource owner to the OAuth provider (i.e. Zoom)
+    using an URL with a few key OAuth parameters.
+    """
+    zoom = OAuth2Session(client_id, redirect_uri=redirect_uri)
+    authorization_url, state = zoom.authorization_url(authorization_base_url)
+    print(authorization_url)
+
+    # State is used to prevent CSRF, keep this for later.
+    session['oauth_state'] = state
+    return redirect(authorization_url)
+
+
+# Step 2: User authorization, this happens on the provider.
+
+@app.route("/zoomcallback", methods=["GET"])
+def zoom_callback():
+    """ Step 3: Retrieving an access token.
+
+    The user has been redirected back from the provider to your registered
+    callback URL. With this redirection comes an authorization code included
+    in the redirect URL. We will use that to obtain an access token.
+    """
+
+    zoom = OAuth2Session(client_id, state=session['oauth_state'], redirect_uri=redirect_uri)
+    token = zoom.fetch_token(token_url, client_secret=client_secret, authorization_response=request.url)
+
+    # At this point you can fetch protected resources but lets save
+    # the token and show how this is done from a persisted token
+    # in /profile.
+    session['oauth_token'] = token
+
+    return redirect(url_for('home'))
+
+
 @app.route("/")
 @app.route("/home")
 def home():
+    if "oauth_token" in session.keys():
+        zoom = OAuth2Session(client_id, token=session['oauth_token'])
+        response = zoom.get("https://api.zoom.us/v2/users/me/meetings").json()  # Test Request
+        print("Hello")
+        print(response)
     meeting_forms = current_user.meeting_forms if current_user.is_authenticated else []
     return render_template('home.html', meeting_forms=meeting_forms)
 
