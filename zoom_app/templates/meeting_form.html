@@ -1,0 +1,82 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="col-md-10">
+  <article class="media content-section">
+    <div class="media-body">
+      <div class="article-metadata">
+        <h2 class="mr-2" disabled="true">{{ meeting_form.meeting_name }}</h2>
+        <small class="text-muted">Date Created: {{ meeting_form.date_created.strftime('%Y-%m-%d') }}</small>
+        <div>
+          <form class="form-inline">
+            <input type="text" class="form-control mr-2" value="{{ view_link }}" id="meeting-link" readonly>
+            <button type="button" class="btn btn-info btn-sm m-1" onclick="copyLink()">Copy Link</button>
+            {% if meeting_form.active %}
+              <button type="button" class="btn btn-danger btn-sm m-1" data-toggle="modal" data-target="#toggleModal">Deactivate</button>
+            {% else %}
+              <button type="button" class="btn btn-success btn-sm m-1" data-toggle="modal" data-target="#toggleModal">Activate</button>
+            {% endif %}
+          </form>
+        </div>
+      </div>
+      <div class="mt-2">
+        <p>Total # of registrants: {{ list_length(meeting_form.registrants) }}.</p>
+      </div>
+      <div>
+        <h4>Registrants' Information:</h4>
+        <table class="table table-bordered table-striped">
+          <thead class="thead-dark">
+            <tr>
+              <th scope="col">#</th>
+              <th scope="col">Email</th>
+              <th scope="col">First Name</th>
+              <th scope="col">Last Name</th>
+              <th scope="col">Address</th>
+              <th scope="col">Job Title</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for registrant in meeting_form.registrants %}
+              <tr>
+                <th scope="row">{{ return_idx_in_list(registrant, meeting_form.registrants) + 1 }}</th>
+                <td>{{ registrant.email }}</td>
+                <td>{{ registrant.first_name }}</td>
+                <td>{{ registrant.last_name }}</td>
+                <td>{{ registrant.address }}</td>
+                <td>{{ registrant.job_title }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </article>
+
+  <!-- Modal -->
+  <div class="modal fade" id="toggleModal" tabindex="-1" role="dialog" aria-labelledby="toggleModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          {% if meeting_form.active %}
+            <h5 class="modal-title" id="toggleModalLabel">Deactivate Form?</h5>
+          {% else %}
+            <h5 class="modal-title" id="toggleModalLabel">Activate Form?</h5>
+          {% endif %}
+          <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+            <span aria-hidden="true">&times;</span>
+          </button>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <form action="{{ url_for('toggle_meeting_form', meeting_form_id=meeting_form.id )}}" method="POST">
+            {% if meeting_form.active %}
+              <input class="btn btn-danger" type="submit" value="Deactivate">
+            {% else %}
+              <input class="btn btn-danger" type="submit" value="Activate">
+            {% endif %}
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock content %}

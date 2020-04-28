@@ -1,0 +1,42 @@
+{% extends "layout.html" %}
+{% block content %}
+<div class="col-md-10">
+  {% if current_user.is_authenticated %}
+    <h2>Forms Management Dashboard</h2>
+    {% if not meeting_forms %}
+      <div>
+        Create your first meeting form <a href="{{ url_for('new_form') }}">here</a>!
+      </div>
+    {% else %}
+      <table class="table table-bordered table-striped">
+        <thead class="thead-dark">
+          <tr>
+            <th scope="col">#</th>
+            <th scope="col">Meeting Name</th>
+            <th scope="col">Meeting ID</th>
+            <th scope="col"># of Registrants</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for meeting_form in meeting_forms %}
+          <tr>
+            <th scope="row">{{ return_idx_in_list(meeting_form, meeting_forms) + 1 }}</th>
+            <td class="align-middle">
+              <a href="{{ url_for('meeting_form', meeting_form_id=meeting_form.id) }}">{{ meeting_form.meeting_name }}</a>
+            </td>
+            <td class="align-middle">{{ meeting_form.meeting_id }}</td>
+            <td class="align-middle">
+                {{ list_length(meeting_form.registrants) }}
+            </td>
+          </tr>
+          {% endfor%}
+        </tbody>
+      </table>
+    {% endif %}
+  {% else %}
+    <div>
+      Please <a href="{{ url_for('login') }}">login</a> to manage your forms.
+    </div>
+  {% endif %}
+</div>
+{% endblock content %}
