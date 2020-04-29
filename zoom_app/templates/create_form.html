@@ -20,16 +20,16 @@
                     {% endif %}
                 </div>
                 <div class="form-group">
-                    {{ form.meeting_name.label(class="form-control-label") }}
-                    {% if form.meeting_name.errors %}
-                        {{ form.meeting_name(class="form-control form-control-lg is-invalid") }}
+                    {{ form.meeting_form_name.label(class="form-control-label") }}
+                    {% if form.meeting_form_name.errors %}
+                        {{ form.meeting_form_name(class="form-control form-control-lg is-invalid") }}
                         <div class="invalid-feedback">
-                            {% for error in form.meeting_name.errors %}
+                            {% for error in form.meeting_form_name.errors %}
                                 <span>{{ error }}</span>
                             {% endfor %}
                         </div>
                     {% else %}
-                        {{ form.meeting_name(class="form-control form-control-lg") }}
+                        {{ form.meeting_form_name(class="form-control form-control-lg") }}
                     {% endif %}
                 </div>
             </fieldset>

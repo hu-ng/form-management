@@ -24,7 +24,7 @@ class User(db.Model, UserMixin):
 class MeetingForm(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     meeting_id = db.Column(BIGINT(unsigned=True), nullable=False)
-    meeting_name = db.Column(db.String(200), nullable=False)
+    meeting_form_name = db.Column(db.String(200), nullable=False)
     date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     active = db.Column(db.Boolean, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)

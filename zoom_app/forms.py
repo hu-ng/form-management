@@ -35,13 +35,8 @@ class LoginForm(FlaskForm):
 
 class MetaMeetingForm(FlaskForm):
     meeting_id = StringField("Meeting ID (from Zoom)", validators=[DataRequired()])  # Should convert back to int before commiting
-    meeting_name = StringField("Meeting Name", validators=[DataRequired()])
+    meeting_form_name = StringField("Name for Form", validators=[DataRequired()])
     submit = SubmitField("Create Meeting Form")
-
-
-    def validate_meeting_id(self, meeting_id):
-        if meeting_id.data != "123":
-            raise ValidationError(f"This meeting does not exist. Please check again. {type(meeting_id)}")
 
 
 class MeetingRegistrationForm(FlaskForm):
