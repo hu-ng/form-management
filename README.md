@@ -20,7 +20,7 @@ JWT is simpler to implement, but then it requires users to manually provide cred
 While the UI can be a bit better, I did include some thoughtful features that are user-friendly in the context of this app:
 
 - Meetings associated with the API credentials are grabbed and listed on the home page, and users can directly press a link to go to a pre-filled "meta-form" to create the viewable form that registrants will view.
-- Each meeting form has its own page, where creators can view details of registrants that signed up with this form. The page also has a quick "click-to-copy" tool for easy sharing. Also, user can activate or deactivate the form, which will toggle its public status.
+- Each meeting form has its own page, where creators can view details of registrants that signed up with this form. The page also has a quick "click-to-copy" tool for easy sharing. Also, user can activate or deactivate the form, which will toggle its public status. I chose deactivation instead of deletion of forms because it is more friendly to handle in the DB.
 - One can create multiple forms for one meeting. This ability can be helpful in the future if the app is extended to allow more form customization (right now the fields are static). It would be useful to tailor the form's appearance/content to different audiences, even if they are signing up for the same meeting. Of course, if a person tries to register for a meeting that he/she already registered for but through a different form, the app will throw an error.
 
 ## Potential Extensions
