@@ -14,6 +14,7 @@ The app has `User`, `MeetingForm`, and `Registrant` objects. A user can have man
 
 ### Zoom Integration
 I successfully tried to use OAuth first, but then I figured that if a registrant access the public view of the form, when he/she submits (POST), the client will likely try to get a refresh token, but it won't do so for the Zoom account of the form's creator, but for the registrant's account. As such, I switched back to using JWT, which will allow registrants to submit changes to the creator's account without any further authentication, which is what we want.
+
 JWT is simpler to implement, but then it requires users to manually provide credentials to the app. Currently, I'm saving credentials to the `User` object. Users can change API credentials, and they are only allowed to manage forms for meetings that are provided by the current API credentials. I figured that it would be reasonable to put this restriction in place.
 ### Features
 While the UI can be a bit better, I did include some thoughtful features that are user-friendly in the context of this app:
