@@ -1,1 +1,1 @@
-web: gunicorn zoom_app:app
+web: gunicorn zoom_app:app; python init_db.py
