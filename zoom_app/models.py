@@ -33,7 +33,7 @@ class MeetingForm(db.Model):
     registrants = db.relationship('Registrant', backref='register_form', lazy=True)
 
     def __repr__(self):
-        return f"Meeting {self.meeting_name}, meeting id: {self.meeting_id}"
+        return f"Meeting {self.meeting_form_name}, meeting id: {self.meeting_id}"
     
 
 # A meeting has many registrants

@@ -1,7 +1,7 @@
 from flask import render_template, url_for, flash, redirect, request, abort, session, make_response
 from flask.json import jsonify
 from zoom_app import app, db, bcrypt
-from zoom_app.forms import RegistrationForm, LoginForm, MeetingRegistrationForm, MetaMeetingForm
+from zoom_app.forms import RegistrationForm, LoginForm, MeetingRegistrationForm, MetaMeetingForm, UpdateAccountForm
 from zoom_app.models import User, MeetingForm, Registrant
 from flask_login import login_user, current_user, logout_user, login_required
 from zoomus import ZoomClient
@@ -26,8 +26,15 @@ def home():
     if current_user.is_authenticated:
         zoom_client = ZoomClient(current_user.api_key, current_user.api_secret)
         meeting_list_response = zoom_client.meeting.list(user_id="me")
+
+        # Grab all meetings associated with this API credentials
         meetings = json.loads(meeting_list_response.content)['meetings']
-        meeting_forms = current_user.meeting_forms
+        meetings_id = [meeting["id"] for meeting in meetings]
+
+        # Get all forms that this user owns that are associated with this API client
+        meeting_forms = MeetingForm.query\
+            .join(User, MeetingForm.user_id == current_user.id)\
+            .filter(MeetingForm.meeting_id.in_(meetings_id)).all()
     else:
         meetings = []
         meeting_forms = []
@@ -70,6 +77,31 @@ def login():
         else:
             flash('Login Unsuccessful. Please check email and password', 'danger')
     return render_template('login.html', title='Login', form=form)
+
+
+@app.route("/account", methods=['GET', 'POST'])
+@login_required
+def account():
+    form = UpdateAccountForm()
+    if form.validate_on_submit():
+        # Commit changes to the db
+        current_user.username = form.username.data
+        current_user.email = form.email.data
+        current_user.api_key = form.api_key.data
+        current_user.api_secret = form.api_secret.data
+        db.session.commit()
+
+        flash("Updated account details", "success")
+        return redirect(url_for("home"))
+
+    # Populate the form with existing data if GET
+    if request.method == "GET":
+        form.username.data = current_user.username
+        form.email.data = current_user.email
+        form.api_key.data = current_user.api_key
+        form.api_secret.data = current_user.api_secret
+
+    return render_template("account.html", legend="View/Update Account", title="Account Details", form=form)
 
 
 @app.route("/logout", methods=['GET', 'POST'])
@@ -135,6 +167,7 @@ def view_meeting_form(meeting_form_id):
     meeting_form = MeetingForm.query.get_or_404(meeting_form_id)
     creator = meeting_form.creator
 
+    # Make zoom client using creator's credentials
     zoom_client = ZoomClient(creator.api_key, creator.api_secret)
 
     # If the form is not active

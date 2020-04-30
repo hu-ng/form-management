@@ -49,6 +49,7 @@
             <th scope="col">Meeting ID</th>
             <th scope="col">Form Name</th>
             <th scope="col"># of Registrants</th>
+            <th scope="col">Active?</th>
           </tr>
         </thead>
         <tbody>
@@ -60,7 +61,10 @@
               <a href="{{ url_for('meeting_form', meeting_form_id=meeting_form.id) }}">{{ meeting_form.meeting_form_name }}</a>
             </td>
             <td class="align-middle">
-                {{ list_length(meeting_form.registrants) }}
+              {{ list_length(meeting_form.registrants) }}
+            </td>
+            <td class="align-middle">
+              {{ meeting_form.active }}
             </td>
           </tr>
           {% endfor%}
