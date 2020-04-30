@@ -1,1 +1,1 @@
-web: flask db upgrade; gunicorn zoom_app:app
+web: gunicorn zoom_app:app
