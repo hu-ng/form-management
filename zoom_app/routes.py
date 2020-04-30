@@ -138,8 +138,22 @@ def new_form(meeting_id, meeting_name):
 @login_required
 def meeting_form(meeting_form_id):
     meeting_form = MeetingForm.query.get_or_404(meeting_form_id)
+
+    zoom_client = ZoomClient(current_user.api_key, current_user.api_secret)
+    meeting_list_response = zoom_client.meeting.list(user_id="me")
+
+    # Grab all meetings associated with this API credentials
+    meetings = json.loads(meeting_list_response.content)['meetings']
+    allowed_meetings_id = [meeting["id"] for meeting in meetings]
+
+    # If user did not create this form
     if meeting_form.creator != current_user:
         abort(403)
+
+    # If user does not have access to this meeting anymore
+    if meeting_form.meeting_id not in allowed_meetings_id:
+        abort(403)
+
     return render_template(
         "meeting_form.html",
         title=meeting_form.meeting_form_name,
