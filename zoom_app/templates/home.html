@@ -3,12 +3,13 @@
 <div class="col-md-10">
   {% if current_user.is_authenticated %}
     <h2 class="mb-5">Forms Management Dashboard</h2>
-    {% if not zoom_status %}
-      <div>
-        If you have not already, connect me to your Zoom account <a href="{{ url_for('zoom_auth') }}">here</a>!
-      </div>
-    {% endif %}
 
+    {% if not meeting_forms %}
+    <div>
+      Create your first meeting form <a href="{{ url_for('new_form') }}">here</a>!
+    </div>
+    {% endif %}
+    
     {% if meetings %}
       <h3>Meetings from Zoom</h3>
       <table class="table table-bordered table-striped">
@@ -39,11 +40,7 @@
       </div>
     {% endif %}
 
-    {% if not meeting_forms %}
-      <div>
-        Create your first meeting form <a href="{{ url_for('new_form') }}">here</a>!
-      </div>
-    {% else %}
+    {% if meeting_forms %}
       <h3>Forms created</h3>
       <table class="table table-bordered table-striped">
         <thead class="thead-dark">

@@ -3,6 +3,8 @@ from flask_login import current_user
 from wtforms import StringField, PasswordField, SubmitField, BooleanField, TextAreaField
 from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
 from zoom_app.models import User, Registrant
+from zoomus import ZoomClient
+import json
 
 
 class RegistrationForm(FlaskForm):
@@ -10,6 +12,8 @@ class RegistrationForm(FlaskForm):
     email = StringField("Email", validators=[DataRequired(), Email()])
     password = PasswordField('Password', validators=[DataRequired()])
     confirm_password = PasswordField('Confirm Password', validators=[DataRequired(), EqualTo('password')])
+    api_key = StringField('API Key (from Zoom)', validators=[DataRequired()])
+    api_secret = StringField('API Secret (from Zoom)', validators=[DataRequired()])
     submit = SubmitField("Sign up")
 
 
@@ -23,6 +27,26 @@ class RegistrationForm(FlaskForm):
         user = User.query.filter_by(email=email.data).first()
         if user:
             raise ValidationError("That email is taken, please choose a different one")
+
+
+    def validate(self):
+        """
+        Send a test request to see if this API credentials are valid
+        """
+        rv = FlaskForm.validate(self)
+        if not rv:
+            return False
+
+        client = ZoomClient(api_key=self.api_key.data, api_secret=self.api_secret.data)
+        response = json.loads(client.user.list().content)
+
+        # If invalid credentials, raise error to the form.
+        if response.get("code") == 124:
+            self.api_key.errors.append(response.get("message"))
+            self.api_secret.errors.append(response.get("message"))
+            return False
+
+        return True
 
 
 class LoginForm(FlaskForm):
@@ -46,10 +70,4 @@ class MeetingRegistrationForm(FlaskForm):
     job_title = StringField("Job Title")
     address = StringField("Address (street name)")
     submit = SubmitField("Sign up for meeting")
-
-
-    def validate_email(self, email):
-        registrant = Registrant.query.filter_by(email=email.data).first()
-        if registrant:
-            raise ValidationError("You have already signed up for this meeting.")
 

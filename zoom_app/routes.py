@@ -4,8 +4,9 @@ from zoom_app import app, db, bcrypt
 from zoom_app.forms import RegistrationForm, LoginForm, MeetingRegistrationForm, MetaMeetingForm
 from zoom_app.models import User, MeetingForm, Registrant
 from flask_login import login_user, current_user, logout_user, login_required
-from requests_oauthlib import OAuth2Session
+from zoomus import ZoomClient
 import time
+import json
 
 
 # Custom Jinja functions
@@ -19,115 +20,18 @@ def utility_processor():
     return dict(list_length=list_length, return_idx_in_list=return_idx_in_list)
 
 
-# Zoom OAuth Authorization. Followed from example found here:
-# https://requests-oauthlib.readthedocs.io/en/latest/examples/real_world_example.html#real-example
-
-@app.route("/zoomauth")
-def zoom_auth():
-    """Step 1: User Authorization.
-
-    Redirect the user/resource owner to the OAuth provider (i.e. Zoom)
-    using an URL with a few key OAuth parameters.
-    """
-    # Get environment variables
-    client_id = app.config.get("CLIENT_ID")
-    redirect_uri = app.config.get("REDIRECT_URI")
-    authorization_base_url = app.config.get("AUTHORIZATION_BASE_URL")
-
-
-    zoom = OAuth2Session(client_id, redirect_uri=redirect_uri)
-    authorization_url, state = zoom.authorization_url(authorization_base_url)
-
-    # State is used to prevent CSRF, keep this for later.
-    session['oauth_state'] = state
-    return redirect(authorization_url)
-
-
-# Step 2: User authorization, this happens on the provider.
-
-@app.route("/zoomcallback", methods=["GET"])
-def zoom_callback():
-    """ Step 3: Retrieving an access token.
-
-    The user has been redirected back from the provider to your registered
-    callback URL. With this redirection comes an authorization code included
-    in the redirect URL. We will use that to obtain an access token.
-    """
-
-    client_id = app.config.get("CLIENT_ID")
-    redirect_uri = app.config.get("REDIRECT_URI")
-    token_url = app.config.get("TOKEN_URL")
-    client_secret = app.config.get("CLIENT_SECRET")
-
-    zoom = OAuth2Session(client_id, state=session['oauth_state'], redirect_uri=redirect_uri)
-    token = zoom.fetch_token(token_url, client_secret=client_secret, authorization_response=request.url)
-
-    # At this point you can fetch protected resources but lets save
-    # the token and show how this is done from a persisted token.
-    session['oauth_token'] = token
-
-    return redirect(url_for('home'))
-
-
-@app.route("/zoomrefresh", methods=["GET"])
-def zoom_refresh():
-    """Refreshing an OAuth 2 token using a refresh token.
-    """
-    token = session['oauth_token']
-
-    client_id = app.config.get("CLIENT_ID")
-    client_secret = app.config.get("CLIENT_SECRET")
-    refresh_url = app.config.get("REFRESH_URL")
-    redirect_uri = app.config.get("REDIRECT_URI")
-
-    extra = {
-        'client_id': client_id,
-        'client_secret': client_secret,
-    }
-
-    zoom = OAuth2Session(client_id, token=token, redirect_uri=redirect_uri)
-    session['oauth_token'] = zoom.refresh_token(refresh_url, **extra)
-    flash("Refreshed access to Zoom Account!", "success")
-    return redirect(url_for("home"))
-
-
-def check_zoom_auth_status():
-    return "oauth_token" in session.keys()
-
-
-def need_refresh():
-    if check_zoom_auth_status():
-        token = session['oauth_token']
-        return time.time() > token["expires_at"]
-    return False
-
-
-def return_zoom_instance():
-    client_id = app.config.get("CLIENT_ID")
-    return OAuth2Session(client_id, token=session['oauth_token'])
-
-
-def get_all_meetings(zoom_instance):
-    if zoom_instance:
-        return zoom_instance.get("https://api.zoom.us/v2/users/me/meetings").json()["meetings"]
-    else:
-        return []
-
-#########################################
-
 @app.route("/")
 @app.route("/home")
 def home():
-    # Check Zoom status
-    zoom_status = check_zoom_auth_status()
-    refresh_status = need_refresh()
-    if zoom_status and refresh_status:
-        return redirect(url_for('zoom_refresh'))
-        
-    zoom = return_zoom_instance() if zoom_status else None
-    meetings = get_all_meetings(zoom)
-    meeting_forms = current_user.meeting_forms if current_user.is_authenticated else []
-    return render_template('home.html', meetings=meetings, meeting_forms=meeting_forms, zoom_status=zoom_status, refresh_status=refresh_status)
+    if current_user.is_authenticated:
+        zoom_client = ZoomClient(current_user.api_key, current_user.api_secret)
+        meeting_list_response = zoom_client.meeting.list(user_id="me")
+        meetings = json.loads(meeting_list_response.content)['meetings']
+        meeting_forms = current_user.meeting_forms
+    else:
+        meetings = []
+        meeting_forms = []
+    return render_template('home.html', meetings=meetings, meeting_forms=meeting_forms)
 
 
 @app.route("/register", methods=['GET', 'POST'])
@@ -137,7 +41,13 @@ def register():
     form = RegistrationForm()
     if form.validate_on_submit():
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
-        user = User(username = form.username.data, email=form.email.data, password=hashed_password)
+        user = User(
+            username = form.username.data,
+            email=form.email.data,
+            password=hashed_password,
+            api_key=form.api_key.data,
+            api_secret=form.api_secret.data
+        )
         db.session.add(user)
         db.session.commit()
         flash(f'Your account has been created. You can now log in.', 'success')
@@ -221,14 +131,12 @@ def toggle_meeting_form(meeting_form_id):
 # Route to view and submit the form (from registrant POV). On POST will call API to actually add the user to the meeting
 @app.route("/meetingforms/<int:meeting_form_id>/view", methods=['GET', 'POST'])
 def view_meeting_form(meeting_form_id):
-    # Check Zoom status
-    zoom_status = check_zoom_auth_status()
-    refresh_status = need_refresh()
-    if zoom_status and refresh_status:
-        return redirect(url_for('zoom_refresh'))
-    zoom = return_zoom_instance() if zoom_status else None
-
+    # Grab meeting form and the creator
     meeting_form = MeetingForm.query.get_or_404(meeting_form_id)
+    creator = meeting_form.creator
+
+    zoom_client = ZoomClient(creator.api_key, creator.api_secret)
+
     # If the form is not active
     if not meeting_form.active:
         flash("This form is not available to fill out anymore.", "info")
@@ -237,24 +145,41 @@ def view_meeting_form(meeting_form_id):
     # If form is still active
     form = MeetingRegistrationForm()
     if form.validate_on_submit():
+
+        # Check if the registrant already signed up for the meeting through any other form.
+        registrant = Registrant.query\
+            .join(MeetingForm, Registrant.meeting_form_id == MeetingForm.id)\
+            .filter(MeetingForm.meeting_id==meeting_form.meeting_id).first()
         
-        # Send the API request here
-        # If successful, then add registrant to db
-        # If not, than just redirect back to the form
-        # For now, just add the registrant
-        
-        registrant = Registrant(
-            email=form.email.data,
-            first_name=form.first_name.data,
-            last_name=form.last_name.data,
-            address=form.address.data,
-            job_title=form.job_title.data,
-            register_form=meeting_form
-        )
-        db.session.add(registrant)
-        db.session.commit()
-        return render_template("meeting_register_complete.html")
+        # If so, they can't sign up again on this form anymore
+        if registrant:
+            flash("You already signed up for this meeting through one of our forms.", "danger")
+            return redirect(url_for("view_meeting_form", meeting_form_id=meeting_form.id))
+
+        # If not, then send a request to the server through the Zoom client
+        request_body = {
+            "email": form.email.data,
+            "first_name": form.first_name.data,
+            "last_name": form.last_name.data
+        }
+
+        response = zoom_client.meeting.post_request(f"/meetings/{meeting_form.meeting_id}/registrants", data=request_body)
+        response_json = json.loads(response.content)
+
+        # If the status code is 200, add the registrant's info to the DB
+        print(response_json)
+        if response_json["code"] == 200:
+            registrant = Registrant(
+                email=form.email.data,
+                first_name=form.first_name.data,
+                last_name=form.last_name.data,
+                address=form.address.data,
+                job_title=form.job_title.data,
+                register_form=meeting_form
+            )
+            db.session.add(registrant)
+            db.session.commit()
+            return render_template("meeting_register_complete.html")
+        else:
+            flash(f"Error: {response_json['message']}")
     return render_template("meeting_form_submittable.html", form=form, title="Meeting Form", legend=f"{meeting_form.meeting_form_name}")
-
-
-# Authorizing Zoom:
