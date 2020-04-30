@@ -83,7 +83,7 @@ class UpdateAccountForm(FlaskForm):
         response = json.loads(client.user.list().content)
 
         # If invalid credentials, raise error to the form.
-        if response.get("code") == 124:
+        if response.get("code") != 200:
             self.api_key.errors.append(response.get("message"))
             self.api_secret.errors.append(response.get("message"))
             return False
@@ -103,6 +103,13 @@ class MetaMeetingForm(FlaskForm):
     meeting_id = StringField("Meeting ID (from Zoom)", validators=[DataRequired()])  # Should convert back to int before commiting
     meeting_form_name = StringField("Name for Form", validators=[DataRequired()])
     submit = SubmitField("Create Meeting Form")
+
+
+    def validate_meeting_id(self, meeting_id):
+        client = ZoomClient(api_key=current_user.api_key, api_secret=current_user.api_secret)
+        response = json.loads(client.meeting.get(id=meeting_id.data).content)
+        if response.get("code") in [300, 3001]:
+            raise ValidationError(response.get("message"))
 
 
 class MeetingRegistrationForm(FlaskForm):

@@ -129,7 +129,8 @@ def new_form(meeting_id, meeting_name):
         db.session.commit()
         flash(f"Created new form for '{meeting_name}'", "success")
         return redirect(url_for("home"))
-    form.meeting_id.data = meeting_id
+    if request.method == "GET":
+        form.meeting_id.data = meeting_id
     return render_template("create_form.html", title="New Form", legend=f"New Form for {meeting_name}", form=form)
 
 
