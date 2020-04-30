@@ -4,7 +4,6 @@ from zoom_app import app, db, bcrypt
 from zoom_app.forms import RegistrationForm, LoginForm, MeetingRegistrationForm, MetaMeetingForm
 from zoom_app.models import User, MeetingForm, Registrant
 from flask_login import login_user, current_user, logout_user, login_required
-from zoom_app.env import *  # Use a library to fix this later
 from requests_oauthlib import OAuth2Session
 import time
 
@@ -30,9 +29,14 @@ def zoom_auth():
     Redirect the user/resource owner to the OAuth provider (i.e. Zoom)
     using an URL with a few key OAuth parameters.
     """
+    # Get environment variables
+    client_id = app.config.get("CLIENT_ID")
+    redirect_uri = app.config.get("REDIRECT_URI")
+    authorization_base_url = app.config.get("AUTHORIZATION_BASE_URL")
+
+
     zoom = OAuth2Session(client_id, redirect_uri=redirect_uri)
     authorization_url, state = zoom.authorization_url(authorization_base_url)
-    print(authorization_url)
 
     # State is used to prevent CSRF, keep this for later.
     session['oauth_state'] = state
@@ -50,6 +54,11 @@ def zoom_callback():
     in the redirect URL. We will use that to obtain an access token.
     """
 
+    client_id = app.config.get("CLIENT_ID")
+    redirect_uri = app.config.get("REDIRECT_URI")
+    token_url = app.config.get("TOKEN_URL")
+    client_secret = app.config.get("CLIENT_SECRET")
+
     zoom = OAuth2Session(client_id, state=session['oauth_state'], redirect_uri=redirect_uri)
     token = zoom.fetch_token(token_url, client_secret=client_secret, authorization_response=request.url)
 
@@ -66,12 +75,17 @@ def zoom_refresh():
     """
     token = session['oauth_token']
 
+    client_id = app.config.get("CLIENT_ID")
+    client_secret = app.config.get("CLIENT_SECRET")
+    refresh_url = app.config.get("REFRESH_URL")
+    redirect_uri = app.config.get("REDIRECT_URI")
+
     extra = {
         'client_id': client_id,
         'client_secret': client_secret,
     }
-    print("refresh")
-    zoom = OAuth2Session(client_id, token=token)
+
+    zoom = OAuth2Session(client_id, token=token, redirect_uri=redirect_uri)
     session['oauth_token'] = zoom.refresh_token(refresh_url, **extra)
     flash("Refreshed access to Zoom Account!", "success")
     return redirect(url_for("home"))
@@ -89,6 +103,7 @@ def need_refresh():
 
 
 def return_zoom_instance():
+    client_id = app.config.get("CLIENT_ID")
     return OAuth2Session(client_id, token=session['oauth_token'])
 
 
@@ -98,10 +113,12 @@ def get_all_meetings(zoom_instance):
     else:
         return []
 
+#########################################
 
 @app.route("/")
 @app.route("/home")
 def home():
+    # Check Zoom status
     zoom_status = check_zoom_auth_status()
     refresh_status = need_refresh()
     if zoom_status and refresh_status:
@@ -204,6 +221,13 @@ def toggle_meeting_form(meeting_form_id):
 # Route to view and submit the form (from registrant POV). On POST will call API to actually add the user to the meeting
 @app.route("/meetingforms/<int:meeting_form_id>/view", methods=['GET', 'POST'])
 def view_meeting_form(meeting_form_id):
+    # Check Zoom status
+    zoom_status = check_zoom_auth_status()
+    refresh_status = need_refresh()
+    if zoom_status and refresh_status:
+        return redirect(url_for('zoom_refresh'))
+    zoom = return_zoom_instance() if zoom_status else None
+
     meeting_form = MeetingForm.query.get_or_404(meeting_form_id)
     # If the form is not active
     if not meeting_form.active:
@@ -218,6 +242,7 @@ def view_meeting_form(meeting_form_id):
         # If successful, then add registrant to db
         # If not, than just redirect back to the form
         # For now, just add the registrant
+        
         registrant = Registrant(
             email=form.email.data,
             first_name=form.first_name.data,
@@ -228,8 +253,8 @@ def view_meeting_form(meeting_form_id):
         )
         db.session.add(registrant)
         db.session.commit()
-        return render_template("meeting_register_complete.html", meeting_form_name=meeting_form.name)
-    return render_template("meeting_form_submittable.html", form=form, title="Meeting Form", legend=f"Meeting Form for {meeting_form.meeting_name}")
+        return render_template("meeting_register_complete.html")
+    return render_template("meeting_form_submittable.html", form=form, title="Meeting Form", legend=f"{meeting_form.meeting_form_name}")
 
 
 # Authorizing Zoom:
